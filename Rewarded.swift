@@ -2,42 +2,45 @@ import SwiftUI
 import GoogleMobileAds
 import UIKit
     
-final class Rewarded: NSObject, GADRewardedAdDelegate{
+
+//In v8 of Google Ads SDK GADFullScreenContentDelegate combines some functionality of GADInterstitialDelegate and GADRewardedAdDelegate
+final class Rewarded: NSObject, GADFullScreenContentDelegate {
     
-    var rewardedAd:GADRewardedAd = GADRewardedAd(adUnitID: rewardID)
-    
-    var rewardFunction: (() -> Void)? = nil
+    var rewardedAd: GADRewardedAd?
     
     override init() {
         super.init()
         LoadRewarded()
     }
     
-    func LoadRewarded(){
-        let req = GADRequest()
-        self.rewardedAd.load(req)
-    }
-    
-    func showAd(rewardFunction: @escaping () -> Void){
-        if self.rewardedAd.isReady{
-            self.rewardFunction = rewardFunction
-            let root = UIApplication.shared.windows.first?.rootViewController
-            self.rewardedAd.present(fromRootViewController: root!, delegate: self)
+    let req = GADRequest()
+        GADRewardedAd.load(withAdUnitID: Constants.shared.rewardAdUnitId, request: req) { rewardedAd, err in
+            if let err = err {
+                print("Failed to load ad with error: \(err)")
+                return
+            }
+            
+            self.rewardedAd = rewardedAd
+            self.rewardedAd?.fullScreenContentDelegate = self
         }
-       else{
-           print("Not Ready")
-       }
-    }
     
-    func rewardedAd(_ rewardedAd: GADRewardedAd, userDidEarn reward: GADAdReward) {
-        if let rf = rewardFunction {
-            rf()
+    func showAd(rewardFunction: @escaping () -> Void) {
+        
+        if let ad = rewardedAd {
+            guard let rootVC = UIApplication.shared.windows.first?.rootViewController else { return }
+            
+            ad.present(fromRootViewController: rootVC) {
+                rewardFunction()
+            }
+        } else {
+            print("Ad not ready")
         }
     }
     
-    func rewardedAdDidDismiss(_ rewardedAd: GADRewardedAd) {
-        self.rewardedAd = GADRewardedAd(adUnitID: rewardID)
+    func adDidDismissFullScreenContent(_ ad: GADFullScreenPresentingAd) {
         LoadRewarded()
+        
+        //Dissmiss VCs from here if needed
     }
 }
 
